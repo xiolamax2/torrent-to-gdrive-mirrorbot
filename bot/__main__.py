@@ -3,12 +3,16 @@ import signal
 import os
 import asyncio
 
-from pyrogram import idle
+from pyrogram import idle, filters, types, emoji
 from bot import app
 from sys import executable
+from datetime import datetime
+import pytz
+import time
+import threading
 
 from telegram import ParseMode
-from telegram.ext import CommandHandler
+from telegram.ext import CommandHandler, InlineKeyboardMarkup, InlineKeyboardButton
 from wserver import start_server_async
 from bot import bot, IMAGE_URL, dispatcher, updater, botStartTime, IGNORE_PENDING_REQUESTS, IS_VPS, SERVER_PORT
 from bot.helper.ext_utils import fs_utils
@@ -21,7 +25,9 @@ from .modules import authorize, list, cancel_mirror, mirror_status, mirror, clon
 
 
 def stats(update, context):
+    global main
     currentTime = get_readable_time(time.time() - botStartTime)
+    current = now.strftime('%m/%d %I:%M:%S %p')
     total, used, free = shutil.disk_usage('.')
     total = get_readable_file_size(total)
     used = get_readable_file_size(used)
@@ -31,41 +37,43 @@ def stats(update, context):
     cpuUsage = psutil.cpu_percent(interval=0.5)
     memory = psutil.virtual_memory().percent
     disk = psutil.disk_usage('/').percent
-    stats = f'<b>╭──「⭕️ BOT STATISTICS ⭕️」</b>\n' \
-            f'<b>│</b>\n' \
-            f'<b>├  ⏰ Bot Uptime : {currentTime}</b>\n' \
-            f'<b>├  💾 Total Disk Space : {total}</b>\n' \
-            f'<b>├  📀 Total Used Space : {used}</b>\n' \
-            f'<b>├  💿 Total Free Space : {free}</b>\n' \
-            f'<b>├  🔼 Total Upload : {sent}</b>\n' \
-            f'<b>├  🔽 Total Download : {recv}</b>\n' \
-            f'<b>├  🖥️ CPU : {cpuUsage}%</b>\n' \
-            f'<b>├  🎮 RAM : {memory}%</b>\n' \
-            f'<b>├  💽 DISK : {disk}%</b>\n' \
-            f'<b>│</b>\n' \
-            f'<b>╰──「 🚸 @AT_BOTs 🚸 」</b>'
-    update.effective_message.reply_photo(IMAGE_URL, stats, parse_mode=ParseMode.HTML)
+    stats = f"〣 {CHAT_NAME} 〣\n\n" \
+            f'Rᴜɴɴɪɴɢ Sɪɴᴄᴇ : {currentTime}\n' \
+            f'Sᴛᴀʀᴛᴇᴅ Aᴛ : {current}\n\n' \
+            f'<b>DISK INFO</b>\n' \
+            f'<b><i>Total</i></b>: {total}\n' \
+            f'<b><i>Used</i></b>: {used} ~ ' \
+            f'<b><i>Free</i></b>: {free}\n\n' \
+            f'<b>DATA USAGE</b>\n' \
+            f'<b><i>UL</i></b>: {sent} ~ ' \
+            f'<b><i>DL</i></b>: {recv}\n\n' \
+            f'<b>SERVER STATS</b>\n' \
+            f'<b><i>CPU</i></b>: {cpuUsage}%\n' \
+            f'<b><i>RAM</i></b>: {memory}%\n' \
+            f'<b><i>DISK</i></b>: {disk}%\n'
+    keyboard = [[InlineKeyboardButton("CLOSE", callback_data="stats_close")]]
+    main = sendMarkup(stats, context.bot, update, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
-def start(update, context):
-    start_string = f'''
-This bot can mirror all your links to Google Drive!
-Type /{BotCommands.HelpCommand} to get a list of available commands
-'''
-    buttons = button_build.ButtonMaker()
-    buttons.buildbutton("Repo", "https://github.com/ayushteke/slam_aria_mirror_bot")
-    buttons.buildbutton("Channel", "https://t.me/AT_BOTs")
-    reply_markup = InlineKeyboardMarkup(buttons.build_menu(2))
-    LOGGER.info('UID: {} - UN: {} - MSG: {}'.format(update.message.chat.id, update.message.chat.username, update.message.text))
+def call_back_data(update, context):
+    global main
+    query = update.callback_query
+    query.answer()
+    main.delete()
+    main = None
+
+
+def start(update:Update, context:CallbackContext) -> None:
+    LOGGER.info('UID: {} - UN: {} - MSG: {}'.format(update.message.chat.id,update.message.chat.username,update.message.text))
     uptime = get_readable_time((time.time() - botStartTime))
     if CustomFilters.authorized_user(update) or CustomFilters.authorized_chat(update):
         if update.message.chat.type == "private" :
-            sendMessage(f"Hey I'm Alive 🙂\nSince: <code>{uptime}</code>", context.bot, update)
+            threading.Thread(target=auto_delete_message, args=(bot, update.message, reply_message)).start()
         else :
-            sendMarkup(IMAGE_URL, start_string, context.bot, update, reply_markup)
+            sendMessage(f"<b>I'm Awake Already!</b>\n<b>Haven't Slept Since:</b> <code>{uptime}</code>", context.bot, update)
     else :
-        sendMarkup(f"Oops! You are not allowed to use me.</b>.", context.bot, update, reply_markup)
-
+        uname = f'<a href="tg://user?id={update.message.from_user.id}">{update.message.from_user.first_name}</a>'
+        sendMessage(f"<b>Hi {uname},</b>\n\n<b>If You Want To Use Me</b>\n\n<b>You Have To Join @KINGS_MIRROR</b>\n\n<b>", context.bot, update)
 
 def restart(update, context):
     restart_message = sendMessage("Restarting, Please wait!", context.bot, update)
@@ -170,17 +178,25 @@ botcmds = [
 
 def main():
     fs_utils.start_cleanup()
-
-    if IS_VPS:
-        asyncio.get_event_loop().run_until_complete(start_server_async(SERVER_PORT))
-
     # Check if the bot is restarting
     if os.path.isfile(".restartmsg"):
         with open(".restartmsg") as f:
             chat_id, msg_id = map(int, f)
-        bot.edit_message_text("Restarted successfully!", chat_id, msg_id)
+        bot.edit_message_text("Restarted Successfully!", chat_id, msg_id)
         os.remove(".restartmsg")
-    bot.set_my_commands(botcmds)
+       # bot.set_my_commands(botcmds)
+    if LOG_GROUP is not None and isinstance(LOG_GROUP, str):
+
+        try:
+            now=datetime.now(pytz.timezone('Asia/Kolkata'))
+            current = now.strftime('%Y/%m/%d %I:%M:%P')
+            dispatcher.bot.sendMessage(f"{LOG_GROUP}", f"Bot Restarted At {current}")
+        except Unauthorized:
+            LOGGER.warning(
+                "Bot isnt able to send message to support_chat, go and check!"
+            )
+        except BadRequest as e:
+            LOGGER.warning(e.message)
 
     start_handler = CommandHandler(BotCommands.StartCommand, start, run_async=True)
     ping_handler = CommandHandler(BotCommands.PingCommand, ping,
