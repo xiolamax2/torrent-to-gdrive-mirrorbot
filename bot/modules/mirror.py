@@ -245,16 +245,25 @@ def _mirror(bot, update, isTar=False, extract=False, isZip=False, isQbit=False):
             if link == "qbs":
                 qbitsel = True
             link = message_args[2]
-            if bot_utils.is_url(link) and not bot_utils.is_magnet(link):
-                resp = requests.get(link)
-                if resp.status_code == 200:
-                    file_name = str(time.time()).replace(".", "") + ".torrent"
-                    with open(file_name, "wb") as f:
-                        f.write(resp.content)
-                    link = f"/usr/src/app/{file_name}"
-                else:
-                    sendMessage("ERROR: link got HTTP response:" + resp.status_code, bot, update)
-                    return
+            elif (
+              not bot_utils.is_url(link)
+              and not bot_utils.is_magnet(link)
+              or len(link) == 0
+        ) and file is None:
+            reply_text = reply_to.text
+            reply_text = re.split('\n ', reply_text)[0]
+            if bot_utils.is_url(reply_text) or bot_utils.is_magnet(reply_text):
+                link = reply_text
+
+    if bot_utils.is_url(link) and not bot_utils.is_magnet(link) and not os.path.exists(link) and isQbit:
+        resp = requests.get(link)
+        if resp.status_code == 200:
+            file_name = str(time.time()).replace(".", "") + ".torrent"
+            open(file_name, "wb").write(resp.content)
+            link = f"{file_name}"
+        else:
+            sendMessage("ERROR: link got HTTP response:" + resp.status_code, bot, update)
+            return
         if link.startswith("|") or link.startswith("pswd: "):
             link = ''
     except IndexError:
