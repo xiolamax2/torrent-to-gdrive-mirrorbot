@@ -245,7 +245,7 @@ def _mirror(bot, update, isTar=False, extract=False, isZip=False, isQbit=False):
             if link == "qbs":
                 qbitsel = True
             link = message_args[2]
-            elif (
+        elif (
               not bot_utils.is_url(link)
               and not bot_utils.is_magnet(link)
               or len(link) == 0
