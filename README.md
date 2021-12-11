@@ -250,5 +250,5 @@ Thanks to:
 - [iamLiquidX](https://github.com/iamLiquidX/) for Speedtest module
 - [ydner](https://github.com/ydner/) for Usage module
 - [breakdowns](https://github.com/breakdowns) for main repo
-- [ayush](https://github.com/ayushteke) for nothing
+- [Jigarvarma2005](https://gitlab.com/Jigarvarma2005) For There GDTOT Code
 
